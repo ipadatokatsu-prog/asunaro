@@ -1,0 +1,17 @@
+{
+  "name": "緊急連絡・安否確認",
+  "short_name": "安否確認",
+  "description": "有事の際の安否報告・出勤可否・チャット連絡システム",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/564/564619.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

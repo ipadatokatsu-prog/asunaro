@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>緊急連絡・安否確認</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#1e3a8a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="安否確認" />
+
+  <!-- OneSignal Web SDK v16 -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --ok: #15803d;
+      --ok-bg: #dcfce7;
+      --warn: #b45309;
+      --warn-bg: #fef3c7;
+      --danger: #b91c1c;
+      --danger-bg: #fee2e2;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Meiryo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding-bottom: 76px;
+    }
+
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    }
+    header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+    .user-badge {
+      font-size: 12px;
+      background: rgba(255,255,255,0.18);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .container { max-width: 640px; margin: 0 auto; padding: 14px; }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card h2 { margin: 0 0 10px; font-size: 15px; }
+    .small { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+    input[type="text"], input[type="url"], select, textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 15px;
+      background: #fff;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.05s;
+    }
+    button:active { transform: scale(0.99); opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--primary); color: #fff; width: 100%; }
+    .btn-secondary { background: #e5e7eb; color: var(--text); }
+    .btn-sm { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
+
+    /* 安否回答ボタン */
+    .status-btn {
+      width: 100%;
+      text-align: left;
+      padding: 16px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .status-1 { background: var(--ok-bg); color: var(--ok); border-color: #86efac; }
+    .status-2 { background: var(--warn-bg); color: var(--warn); border-color: #fcd34d; }
+    .status-3 { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
+    .status-title { font-size: 16px; font-weight: 800; }
+    .status-sub { font-size: 12px; opacity: 0.9; }
+
+    .current-status {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* チャット */
+    .chat-box {
+      max-height: 420px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 4px 0 10px;
+    }
+    .msg {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #f1f5f9;
+      font-size: 14px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.admin {
+      background: #fef2f2;
+      border-left: 4px solid var(--danger);
+    }
+    .msg.mine {
+      background: #dbeafe;
+      align-self: flex-end;
+      max-width: 88%;
+    }
+    .msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+
+    .chat-input-row { display: flex; gap: 8px; margin-top: 8px; }
+    .chat-input-row input { flex: 1; font-size: 14px; }
+
+    /* 管理者集計 */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat-box {
+      padding: 10px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      text-align: center;
+    }
+    .stat-num { font-size: 22px; font-weight: 800; }
+    .stat-label { font-size: 12px; color: var(--muted); }
+
+    .staff-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .b-ok { background: var(--ok-bg); color: var(--ok); }
+    .b-warn { background: var(--warn-bg); color: var(--warn); }
+    .b-danger { background: var(--danger-bg); color: var(--danger); }
+    .b-none { background: #e5e7eb; color: #374151; }
+
+    .ios-banner {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    /* 下部ナビゲーション */
+    nav.bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid var(--border);
+      display: flex;
+      z-index: 30;
+    }
+    .nav-btn {
+      flex: 1;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 4px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .nav-btn.active { color: var(--primary); background: #eff6ff; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🚨 緊急連絡・安否確認</h1>
+  <div id="headerUserBadge" class="user-badge">未登録</div>
+</header>
+
+<div class="container">
+  <!-- iPhone Safari ブラウザ表示時の案内 -->
+  <div id="iosGuideBanner" class="ios-banner">
+    <strong>iPhoneで通知を受け取るには：</strong><br />
+    Safari下部の共有ボタン（□に↑）から<strong>「ホーム画面に追加」</strong>し、ホーム画面のアイコンから開いて通知を許可してください。
+  </div>
+
+  <!-- ① 初回登録・設定画面 -->
+  <section id="view-setup" class="card">
+    <h2>初期設定・通知登録</h2>
+    <p class="small">ご自身の氏名を選択して通知を許可すると、次回から簡単に安否回答とチャットが使えます。</p>
+
+    <div id="gasUrlBox">
+      <label for="gasUrlInput">GAS ウェブアプリURL（初回のみ）</label>
+      <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button type="button" class="btn-secondary btn-sm" style="margin-top:6px;" onclick="saveGasUrlAndReload()">URLを保存して名簿を読み込む</button>
+    </div>
+
+    <label for="staffSelect">ご自身の名前を選択</label>
+    <select id="staffSelect">
+      <option value="">-- 読み込み中 --</option>
+    </select>
+
+    <div style="margin-top:16px;">
+      <button type="button" id="registerBtn" class="btn-primary" onclick="registerStaffAndPush()">
+        この端末で通知を受け取る（登録完了）
+      </button>
+    </div>
+    <p id="setupStatus" class="small" style="margin-top:10px;"></p>
+  </section>
+
+  <!-- ② 安否回答タブ -->
+  <section id="view-safety" class="card hidden">
+    <h2>現在の安否と出勤可否を回答</h2>
+    <div id="myCurrentStatus" class="current-status">現在の回答：未回答</div>
+
+    <button type="button" class="status-btn status-1" onclick="selectStatus('① 本人・家族ともに無事（出社できる）', false)">
+      <span class="status-title">① 本人・家族ともに無事（出社できる）</span>
+      <span class="status-sub">タップして即座に送信</span>
+    </button>
+
+    <button type="button" class="status-btn status-2" onclick="selectStatus('② 本人・家族ともに無事（出社できない）', false)">
+      <span class="status-title">② 本人・家族ともに無事（出社できない・交通麻痺など）</span>
+      <span class="status-sub">タップして即座に送信</span>
+    </button>
+
+    <button type="button" class="status-btn status-3" onclick="selectStatus('③ 被害・ケガあり', true)">
+      <span class="status-title">③ 被害・ケガあり（詳細を管理者へ連絡）</span>
+      <span class="status-sub">タップすると詳細入力欄が開きます</span>
+    </button>
+
+    <div id="damageDetailBox" class="hidden" style="margin-top:10px;">
+      <label for="damageNote">被害・ケガ・困りごとの詳細（管理者との個別トークにも送信されます）</label>
+      <textarea id="damageNote" placeholder="例：自宅の停電・断水あり、軽傷、〇〇方面の道路が寸断されています など"></textarea>
+      <button type="button" class="btn-primary" style="background:var(--danger); margin-top:8px;" onclick="submitDamageStatus()">
+        ③ 被害ありとして送信する
+      </button>
+    </div>
+
+    <p id="safetyResultMsg" class="small" style="margin-top:10px; font-weight:600;"></p>
+  </section>
+
+  <!-- ③ 全体チャットタブ -->
+  <section id="view-global-chat" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">全体チャット（全職員共有）</h2>
+      <button type="button" class="btn-secondary btn-sm" onclick="refreshChats()">更新</button>
+    </div>
+    <p class="small">道路状況や施設の稼働状況など、全員で共有したい情報を投稿できます。</p>
+
+    <div id="globalChatList" class="chat-box"></div>
+
+    <div class="chat-input-row">
+      <input type="text" id="globalChatInput" placeholder="全体へメッセージを入力..." onkeydown="if(event.key==='Enter') sendGlobalChat()" />
+      <button type="button" class="btn-primary btn-sm" style="width:auto;" onclick="sendGlobalChat()">送信</button>
+    </div>
+  </section>
+
+  <!-- ④ 個別トークタブ -->
+  <section id="view-private-chat" class="card hidden">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">管理者との個別トーク</h2>
+      <button type="button" class="btn-secondary btn-sm" onclick="refreshChats()">更新</button>
+    </div>
+    <p class="small">被害・ケガの詳細や、個別の出勤相談など、本人と管理者のみが確認できます。</p>
+
+    <div id="privateChatList" class="chat-box"></div>
+
+    <div class="chat-input-row">
+      <input type="text" id="privateChatInput" placeholder="管理者へメッセージを入力..." onkeydown="if(event.key==='Enter') sendPrivateChat()" />
+      <button type="button" class="btn-primary btn-sm" style="width:auto;" onclick="sendPrivateChat()">送信</button>
+    </div>
+  </section>
+
+  <!-- ⑤ 管理者専用タブ -->
+  <section id="view-admin" class="hidden">
+    <div class="card">
+      <h2>発災・一斉プッシュ通知</h2>
+      <p class="small">通知登録済みの全職員のスマホへ一斉プッシュ通知を送信します。</p>
+      <label for="broadcastTitle">通知タイトル</label>
+      <input type="text" id="broadcastTitle" value="【緊急】安否確認のお願い" />
+      <label for="broadcastMsg">通知メッセージ</label>
+      <textarea id="broadcastMsg">地震・災害が発生しました。アプリを開いて現在の安否と出勤可否を回答してください。</textarea>
+      <button type="button" class="btn-primary" style="background:var(--danger); margin-top:10px;" onclick="sendEmergencyBroadcast()">
+        🚨 全職員へ一斉通知を送信する
+      </button>
+      <p id="broadcastResult" class="small" style="margin-top:8px;"></p>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">安否集計一覧</h2>
+        <button type="button" class="btn-secondary btn-sm" onclick="loadInitialData()">最新化</button>
+      </div>
+      <div id="adminSummaryGrid" class="summary-grid" style="margin-top:10px;"></div>
+      <div id="adminStaffList"></div>
+    </div>
+
+    <div class="card">
+      <h2>個別トーク返信（管理者）</h2>
+      <label for="adminTargetStaffSelect">返信する職員を選択</label>
+      <select id="adminTargetStaffSelect" onchange="loadAdminPrivateThread()">
+        <option value="">-- 選択してください --</option>
+      </select>
+      <div id="adminPrivateThread" class="chat-box" style="margin-top:10px;"></div>
+      <div class="chat-input-row">
+        <input type="text" id="adminPrivateReplyInput" placeholder="職員へ返信..." onkeydown="if(event.key==='Enter') sendAdminPrivateReply()" />
+        <button type="button" class="btn-primary btn-sm" style="width:auto;" onclick="sendAdminPrivateReply()">返信</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 下部タブバー -->
+<nav class="bottom-nav">
+  <button type="button" class="nav-btn active" data-tab="safety" onclick="switchTab('safety')">
+    <span>安否回答</span>
+  </button>
+  <button type="button" class="nav-btn" data-tab="global-chat" onclick="switchTab('global-chat')">
+    <span>全体チャット</span>
+  </button>
+  <button type="button" class="nav-btn" data-tab="private-chat" onclick="switchTab('private-chat')">
+    <span>個別トーク</span>
+  </button>
+  <button type="button" class="nav-btn hidden" id="navAdminBtn" data-tab="admin" onclick="switchTab('admin')">
+    <span>管理者</span>
+  </button>
+  <button type="button" class="nav-btn" data-tab="setup" onclick="switchTab('setup')">
+    <span>設定</span>
+  </button>
+</nav>
+
+<script>
+  // ==========================================
+  // 設定（取得済みの OneSignal App ID を組込済）
+  // ==========================================
+  const ONESIGNAL_APP_ID = "fbfdb721-e9ad-4723-aecc-24d81236fea7";
+  // 公開後に固定したい場合は下の DEFAULT_GAS_URL にGASのウェブアプリURLを入れてください
+  const DEFAULT_GAS_URL = "";
+
+  const STORAGE_KEYS = {
+    GAS_URL: "anpi_gas_url",
+    STAFF_ID: "anpi_staff_id"
+  };
+
+  let state = {
+    gasUrl: localStorage.getItem(STORAGE_KEYS.GAS_URL) || DEFAULT_GAS_URL,
+    staffId: localStorage.getItem(STORAGE_KEYS.STAFF_ID) || "",
+    staffList: [],
+    currentStaff: null,
+    globalChat: [],
+    privateChat: []
+  };
+
+  // ==========================================
+  // 初期化
+  // ==========================================
+  window.addEventListener("DOMContentLoaded", () => {
+    checkIosStandaloneGuide();
+    initOneSignal();
+
+    const urlInput = document.getElementById("gasUrlInput");
+    urlInput.value = state.gasUrl;
+
+    if (state.gasUrl) {
+      loadInitialData();
+    } else {
+      switchTab("setup");
+      document.getElementById("setupStatus").textContent = "先にGASのウェブアプリURLを入力して保存してください。";
+    }
+
+    // 15秒ごとにチャットを自動更新
+    setInterval(() => {
+      if (state.gasUrl && state.staffId) {
+        refreshChats(true);
+      }
+    }, 15000);
+  });
+
+  function checkIosStandaloneGuide() {
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+    if (isIos && !isStandalone) {
+      document.getElementById("iosGuideBanner").style.display = "block";
+    }
+  }
+
+  function initOneSignal() {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true
+      });
+    });
+  }
+
+  function saveGasUrlAndReload() {
+    const val = document.getElementById("gasUrlInput").value.trim();
+    if (!val || !val.startsWith("https://")) {
+      alert("https:// から始まるGASのウェブアプリURLを入力してください。");
+      return;
+    }
+    state.gasUrl = val;
+    localStorage.setItem(STORAGE_KEYS.GAS_URL, val);
+    loadInitialData();
+  }
+
+  // ==========================================
+  // API通信ヘルパー
+  // ==========================================
+  async function apiGet(params) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${state.gasUrl}?${query}`);
+    return await res.json();
+  }
+
+  async function apiPost(payload) {
+    // GASのCORS制限を回避するため text/plain で送信
+    const res = await fetch(state.gasUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  }
+
+  // ==========================================
+  // データ読み込み・画面反映
+  // ==========================================
+  async function loadInitialData() {
+    try {
+      const data = await apiGet({ action: "init", staffId: state.staffId });
+      if (!data.ok) throw new Error(data.error || "読み込みエラー");
+
+      state.staffList = data.staffList || [];
+      state.globalChat = data.globalChat || [];
+      state.privateChat = data.privateChat || [];
+
+      renderStaffSelect();
+      syncCurrentStaff();
+      renderGlobalChat();
+      renderPrivateChat();
+      renderAdminPanel();
+
+      if (!state.staffId) {
+        switchTab("setup");
+      } else {
+        switchTab("safety");
+      }
+    } catch (err) {
+      document.getElementById("setupStatus").textContent = "通信エラー: " + err.message;
+    }
+  }
+
+  function renderStaffSelect() {
+    const select = document.getElementById("staffSelect");
+    select.innerHTML = '<option value="">-- 選択してください --</option>';
+    state.staffList.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.staffId;
+      opt.textContent = `${s.name}（${s.department || "所属未設定"}）`;
+      if (s.staffId === state.staffId) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    const adminSel = document.getElementById("adminTargetStaffSelect");
+    const prevVal = adminSel.value;
+    adminSel.innerHTML = '<option value="">-- 選択してください --</option>';
+    state.staffList.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.staffId;
+      opt.textContent = `${s.name}（${s.latestStatus}）`;
+      if (s.staffId === prevVal) opt.selected = true;
+      adminSel.appendChild(opt);
+    });
+  }
+
+  function syncCurrentStaff() {
+    state.currentStaff = state.staffList.find(s => s.staffId === state.staffId) || null;
+    const badge = document.getElementById("headerUserBadge");
+    const adminNav = document.getElementById("navAdminBtn");
+
+    if (state.currentStaff) {
+      badge.textContent = `${state.currentStaff.name}`;
+      document.getElementById("myCurrentStatus").textContent =
+        `現在の回答：${state.currentStaff.latestStatus}`;
+      if (state.currentStaff.role === "管理者") {
+        adminNav.classList.remove("hidden");
+      } else {
+        adminNav.classList.add("hidden");
+      }
+    } else {
+      badge.textContent = "未登録";
+      adminNav.classList.add("hidden");
+    }
+  }
+
+  // ==========================================
+  // 通知許可＆職員登録
+  // ==========================================
+  async function registerStaffAndPush() {
+    const selectedId = document.getElementById("staffSelect").value;
+    if (!selectedId) {
+      alert("ご自身の名前を選択してください。");
+      return;
+    }
+    if (!state.gasUrl) {
+      alert("先にGASのURLを保存してください。");
+      return;
+    }
+
+    const btn = document.getElementById("registerBtn");
+    const statusEl = document.getElementById("setupStatus");
+    btn.disabled = true;
+    statusEl.textContent = "通知の許可をリクエスト中...";
+
+    try {
+      let pushId = "";
+      if (window.OneSignalDeferred) {
+        await new Promise((resolve) => {
+          OneSignalDeferred.push(async function(OneSignal) {
+            try {
+              await OneSignal.Notifications.requestPermission();
+              pushId = OneSignal.User.PushSubscription.id || "";
+            } catch (e) {
+              console.warn("OneSignal permission note:", e);
+            }
+            resolve();
+          });
+        });
+      }
+
+      state.staffId = selectedId;
+      localStorage.setItem(STORAGE_KEYS.STAFF_ID, selectedId);
+
+      if (pushId) {
+        await apiPost({ action: "registerPush", staffId: selectedId, pushId: pushId });
+      }
+
+      await loadInitialData();
+      statusEl.textContent = pushId
+        ? "登録と通知設定が完了しました！"
+        : "職員情報を保存しました（通知許可の状態は端末設定をご確認ください）。";
+      switchTab("safety");
+    } catch (err) {
+      statusEl.textContent = "登録エラー: " + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ==========================================
+  // 安否回答送信
+  // ==========================================
+  function selectStatus(statusLabel, requiresNote) {
+    if (!state.staffId) {
+      alert("先に「設定」タブからご自身の名前を登録してください。");
+      switchTab("setup");
+      return;
+    }
+
+    if (requiresNote) {
+      document.getElementById("damageDetailBox").classList.remove("hidden");
+      document.getElementById("damageNote").focus();
+      return;
+    }
+
+    document.getElementById("damageDetailBox").classList.add("hidden");
+    sendSafetyStatus(statusLabel, "");
+  }
+
+  function submitDamageStatus() {
+    const note = document.getElementById("damageNote").value.trim();
+    sendSafetyStatus("③ 被害・ケガあり", note);
+  }
+
+  async function sendSafetyStatus(statusLabel, note) {
+    const msgEl = document.getElementById("safetyResultMsg");
+    msgEl.textContent = "送信中...";
+
+    try {
+      const res = await apiPost({
+        action: "submitStatus",
+        staffId: state.staffId,
+        status: statusLabel,
+        note: note
+      });
+      if (!res.ok) throw new Error(res.error || "送信失敗");
+
+      msgEl.textContent = `送信完了（${res.data.timestamp}）：${statusLabel}`;
+      document.getElementById("damageNote").value = "";
+      document.getElementById("damageDetailBox").classList.add("hidden");
+      await loadInitialData();
+    } catch (err) {
+      msgEl.textContent = "送信エラー: " + err.message;
+    }
+  }
+
+  // ==========================================
+  // チャット送受信
+  // ==========================================
+  async function refreshChats(silent = false) {
+    try {
+      const data = await apiGet({ action: "chat", staffId: state.staffId });
+      if (data.ok) {
+        state.globalChat = data.globalChat || [];
+        state.privateChat = data.privateChat || [];
+        renderGlobalChat();
+        renderPrivateChat();
+        if (document.getElementById("adminTargetStaffSelect").value) {
+          loadAdminPrivateThread();
+        }
+      }
+    } catch (e) {
+      if (!silent) console.error(e);
+    }
+  }
+
+  function renderGlobalChat() {
+    const box = document.getElementById("globalChatList");
+    if (!state.globalChat.length) {
+      box.innerHTML = '<div class="small">まだメッセージはありません。</div>';
+      return;
+    }
+    box.innerHTML = state.globalChat.map(m => {
+      const cls = m.role === "管理者" ? "msg admin" : "msg";
+      return `
+        <div class="${cls}">
+          <div class="msg-meta">${escapeHtml(m.senderName)} ・ ${escapeHtml(m.timestamp)}</div>
+          <div>${escapeHtml(m.text)}</div>
+        </div>
+      `;
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendGlobalChat() {
+    if (!state.staffId) return alert("先に設定タブから名前を登録してください。");
+    const input = document.getElementById("globalChatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+
+    await apiPost({ action: "postGlobalChat", staffId: state.staffId, text });
+    await refreshChats(true);
+  }
+
+  function renderPrivateChat() {
+    const box = document.getElementById("privateChatList");
+    if (!state.privateChat.length) {
+      box.innerHTML = '<div class="small">管理者との個別メッセージはまだありません。</div>';
+      return;
+    }
+    box.innerHTML = state.privateChat.map(m => {
+      const cls = m.senderRole === "管理者" ? "msg admin" : "msg mine";
+      return `
+        <div class="${cls}">
+          <div class="msg-meta">${escapeHtml(m.senderName)} ・ ${escapeHtml(m.timestamp)}</div>
+          <div>${escapeHtml(m.text)}</div>
+        </div>
+      `;
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendPrivateChat() {
+    if (!state.staffId) return alert("先に設定タブから名前を登録してください。");
+    const input = document.getElementById("privateChatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+
+    await apiPost({
+      action: "postPrivateChat",
+      targetStaffId: state.staffId,
+      senderStaffId: state.staffId,
+      senderRole: "職員",
+      text
+    });
+    await refreshChats(true);
+  }
+
+  // ==========================================
+  // 管理者機能
+  // ==========================================
+  async function sendEmergencyBroadcast() {
+    if (!confirm("登録済みの全職員のスマホへ一斉通知を送信します。よろしいですか？")) return;
+    const title = document.getElementById("broadcastTitle").value.trim();
+    const message = document.getElementById("broadcastMsg").value.trim();
+    const out = document.getElementById("broadcastResult");
+    out.textContent = "一斉送信中...";
+
+    try {
+      const res = await apiPost({
+        action: "sendEmergencyBroadcast",
+        adminStaffId: state.staffId,
+        title,
+        message
+      });
+      if (!res.ok) throw new Error(res.error || "送信失敗");
+      out.textContent = "一斉通知を送信しました！";
+      await refreshChats(true);
+    } catch (err) {
+      out.textContent = "送信エラー: " + err.message;
+    }
+  }
+
+  function renderAdminPanel() {
+    if (!state.currentStaff || state.currentStaff.role !== "管理者") return;
+
+    let c1 = 0, c2 = 0, c3 = 0, cNone = 0;
+    state.staffList.forEach(s => {
+      if (s.latestStatus.startsWith("①")) c1++;
+      else if (s.latestStatus.startsWith("②")) c2++;
+      else if (s.latestStatus.startsWith("③")) c3++;
+      else cNone++;
+    });
+
+    document.getElementById("adminSummaryGrid").innerHTML = `
+      <div class="stat-box"><div class="stat-num" style="color:var(--ok);">${c1}</div><div class="stat-label">① 無事（出社可）</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--warn);">${c2}</div><div class="stat-label">② 無事（出社不可）</div></div>
+      <div class="stat-box"><div class="stat-num" style="color:var(--danger);">${c3}</div><div class="stat-label">③ 被害・ケガあり</div></div>
+      <div class="stat-box"><div class="stat-num">${cNone}</div><div class="stat-label">未回答</div></div>
+    `;
+
+    // ③被害あり・未回答を優先表示
+    const sorted = [...state.staffList].sort((a, b) => rankStatus(a.latestStatus) - rankStatus(b.latestStatus));
+    document.getElementById("adminStaffList").innerHTML = sorted.map(s => {
+      const badgeClass = s.latestStatus.startsWith("①") ? "b-ok"
+        : s.latestStatus.startsWith("②") ? "b-warn"
+        : s.latestStatus.startsWith("③") ? "b-danger" : "b-none";
+      return `
+        <div class="staff-row">
+          <div><strong>${escapeHtml(s.name)}</strong> <span class="small">(${escapeHtml(s.department)})</span></div>
+          <span class="badge ${badgeClass}">${escapeHtml(s.latestStatus)}</span>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function rankStatus(st) {
+    if (st.startsWith("③")) return 1;
+    if (st === "未回答") return 2;
+    if (st.startsWith("②")) return 3;
+    return 4;
+  }
+
+  async function loadAdminPrivateThread() {
+    const targetId = document.getElementById("adminTargetStaffSelect").value;
+    const box = document.getElementById("adminPrivateThread");
+    if (!targetId) {
+      box.innerHTML = "";
+      return;
+    }
+    const data = await apiGet({ action: "chat", staffId: targetId });
+    const list = data.privateChat || [];
+    box.innerHTML = list.length ? list.map(m => `
+      <div class="msg ${m.senderRole === "管理者" ? "msg admin" : "msg"}">
+        <div class="msg-meta">${escapeHtml(m.senderName)} ・ ${escapeHtml(m.timestamp)}</div>
+        <div>${escapeHtml(m.text)}</div>
+      </div>
+    `).join("") : '<div class="small">やり取りはありません。</div>';
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendAdminPrivateReply() {
+    const targetId = document.getElementById("adminTargetStaffSelect").value;
+    const input = document.getElementById("adminPrivateReplyInput");
+    const text = input.value.trim();
+    if (!targetId || !text) return;
+    input.value = "";
+
+    await apiPost({
+      action: "postPrivateChat",
+      targetStaffId: targetId,
+      senderStaffId: state.staffId,
+      senderRole: "管理者",
+      text
+    });
+    await loadAdminPrivateThread();
+  }
+
+  // ==========================================
+  // タブ切り替え・エスケープ
+  // ==========================================
+  function switchTab(tabName) {
+    ["setup", "safety", "global-chat", "private-chat", "admin"].forEach(t => {
+      const el = document.getElementById("view-" + t);
+      if (el) el.classList.toggle("hidden", t !== tabName);
+    });
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.tab === tabName);
+    });
+    if (tabName === "global-chat" || tabName === "private-chat") {
+      refreshChats(true);
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+</script>
+</body>
+</html>
