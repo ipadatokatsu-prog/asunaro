@@ -454,11 +454,11 @@
     }
   }
 
-  function initOneSignal() {
+ function initOneSignal() {
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
-        appId: ONESIGNAL_APP_ID,
+        appId: "fbfdb721-e9ad-4723-aecc-24d81236fea7",
         serviceWorkerParam: { scope: "/asunaro/" },
         serviceWorkerPath: "/asunaro/OneSignalSDKWorker.js",
         allowLocalhostAsSecureOrigin: true
