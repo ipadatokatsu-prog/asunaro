@@ -459,6 +459,8 @@
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
         appId: ONESIGNAL_APP_ID,
+        serviceWorkerParam: { scope: "/asunaro/" },
+        serviceWorkerPath: "/asunaro/OneSignalSDKWorker.js",
         allowLocalhostAsSecureOrigin: true
       });
     });
