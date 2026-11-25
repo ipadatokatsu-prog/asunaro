@@ -10,13 +10,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="安否確認" />
 
-  <!-- OneSignal Web SDK v16 -->
- <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+ <!-- OneSignal Web SDK v16 -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     OneSignalDeferred.push(async function(OneSignal) {
       await OneSignal.init({
         appId: "fbfdb721-e9ad-4723-aecc-24d81236fea7",
+        serviceWorkerParam: { scope: "/asunaro/" },
+        serviceWorkerPath: "/asunaro/OneSignalSDKWorker.js"
       });
     });
   </script>
